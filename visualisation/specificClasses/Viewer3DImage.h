@@ -23,8 +23,8 @@ template < typename Space = DGtal::Z3i::Space, typename KSpace = DGtal::Z3i::KSp
 class Viewer3DImage: public DGtal::Viewer3D <Space, KSpace>
 {
 
-  typedef DGtal::ImageContainerBySTLVector<DGtal::Z3i::Domain, unsigned char> Image3D;
-  typedef DGtal::ImageContainerBySTLVector<DGtal::Z2i::Domain, unsigned char> Image2D;
+  typedef DGtal::ImageContainerBySTLVector<DGtal::Z3i::Domain, int> Image3D;
+  typedef DGtal::ImageContainerBySTLVector<DGtal::Z2i::Domain, int> Image2D;
  
   typedef DGtal::ConstImageAdapter<Image3D, Image2D::Domain, DGtal::Projector< DGtal::Z3i::Space>,
 				  Image3D::Value,  DGtal::DefaultFunctor >  SliceImageAdapter;

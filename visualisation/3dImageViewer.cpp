@@ -60,11 +60,23 @@ using namespace Z3i;
 ///////////////////////////////////////////////////////////////////////////////
 namespace po = boost::program_options;
 
+  template<typename T>
+  struct HounsfieldToGrayscaleFunctor
+  {
+    int minHounsfieldValue;
+    int maxHounsfieldValue;
+    HounsfieldToGrayscaleFunctor() : minHounsfieldValue(-3000), maxHounsfieldValue(3000) {}
+    HounsfieldToGrayscaleFunctor( const int &min, const int &max ) : minHounsfieldValue(min), maxHounsfieldValue(max) {}
+    inline
+    T operator() (const T& a) const
+    { return a<=minHounsfieldValue ? 0 : a >= maxHounsfieldValue ? 255 : (a-minHounsfieldValue)*(255./(maxHounsfieldValue-minHounsfieldValue)); }
+  };
+
 int main( int argc, char** argv )
 {
 
-  typedef DGtal::ImageContainerBySTLVector<DGtal::Z3i::Domain,  unsigned char > Image3D;
-  typedef DGtal::ImageContainerBySTLVector<DGtal::Z2i::Domain,  unsigned char > Image2D;
+  typedef DGtal::ImageContainerBySTLVector<DGtal::Z3i::Domain,  int > Image3D;
+  typedef DGtal::ImageContainerBySTLVector<DGtal::Z2i::Domain,  int > Image2D;
 
   
   // parse command line ----------------------------------------------
@@ -85,7 +97,12 @@ int main( int argc, char** argv )
     ("scaleX,x",  po::value<float>()->default_value(1.0), "set the scale value in the X direction (default 1.0)" )
     ("scaleY,y",  po::value<float>()->default_value(1.0), "set the scale value in the Y direction (default 1.0)" )
     ("scaleZ,z",  po::value<float>()->default_value(1.0), "set the scale value in the Z direction (default 1.0)")    
-    ("transparency,t",  po::value<uint>()->default_value(255), "transparency") ; 
+    ("transparency,t",  po::value<uint>()->default_value(255), "transparency")
+#ifdef WITH_ITK
+    ("dicomMin", po::value<int>()->default_value(-1000), "set minimum density threshold on Hounsfield scale")
+    ("dicomMax", po::value<int>()->default_value(3000), "set maximum density threshold on Hounsfield scale")
+#endif
+     ;
   
   bool parseOK=true;
   po::variables_map vm;
@@ -121,7 +138,11 @@ int main( int argc, char** argv )
   float sz = vm["scaleZ"].as<float>();
 
   string extension = inputFilename.substr(inputFilename.find_last_of(".") + 1);
-  if(extension!="vol" && extension != "p3d" && extension != "pgm3D" && extension != "pgm3d" && extension != "sdp" && extension != "pgm" ){
+  if(extension!="vol" && extension != "p3d" && extension != "pgm3D" && extension != "pgm3d" && extension != "sdp" && extension != "pgm"
+#ifdef WITH_ITK
+    && extension != "dcm" 
+#endif
+    ){
     trace.info() << "File extension not recognized: "<< extension << std::endl;
     return 0;
   }
@@ -138,10 +159,15 @@ int main( int argc, char** argv )
   Viewer3DImage<> viewer(mode);
   viewer.setWindowTitle("simple Volume Viewer");
   viewer.show();
-  viewer.setGLScale(sx, sy, sz);  
-  
+  viewer.setGLScale(sx, sy, sz);
 
+#ifdef WITH_ITK
+  int dicomMin = vm["dicomMin"].as<int>();
+  int dicomMax = vm["dicomMax"].as<int>();
+  Image3D image = extension == "dcm" ? DicomReader< Image3D, HounsfieldToGrayscaleFunctor<int> >::importDicom( inputFilename, HounsfieldToGrayscaleFunctor<int>(dicomMin,dicomMax) ) : GenericReader<Image3D>::import( inputFilename );
+#else
   Image3D image = GenericReader<Image3D>::import( inputFilename );
+#endif
   Domain domain = image.domain();
   
   trace.info() << "Image loaded: "<<image<< std::endl;
@@ -160,7 +186,7 @@ int main( int argc, char** argv )
     gradient.addColor(Color::Yellow);
     gradient.addColor(Color::Red);
     for(Domain::ConstIterator it = domain.begin(), itend=domain.end(); it!=itend; ++it){
-      unsigned char  val= image( (*it) );           
+      int  val= image( (*it) );           
       Color c= gradient(val);
       if(val<=thresholdMax && val >=thresholdMin){
 	if(!vm.count("displayDigitalSurface")){
